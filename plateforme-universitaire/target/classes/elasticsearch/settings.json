@@ -1,0 +1,20 @@
+{
+  "analysis": {
+    "analyzer": {
+      "french": {
+        "tokenizer": "standard",
+        "filter": ["lowercase", "french_stop", "french_stemmer"]
+      }
+    },
+    "filter": {
+      "french_stop": {
+        "type": "stop",
+        "stopwords": "_french_"
+      },
+      "french_stemmer": {
+        "type": "stemmer",
+        "language": "light_french"
+      }
+    }
+  }
+}

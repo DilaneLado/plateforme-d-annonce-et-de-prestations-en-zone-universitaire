@@ -1,0 +1,881 @@
+{
+  "info": {
+    "name": "Plateforme Universitaire - API Tests",
+    "description": "Collection de tests pour la Plateforme Universitaire (Université de Dschang)\n\n⚠️ AVANT DE COMMENCER :\n1. Lancez votre Spring Boot sur http://localhost:8080\n2. Lancez Elasticsearch sur http://localhost:9200\n3. Générez un token JWT via l'onglet 'Pré-requis' ou utilisez le script auto dans la variable {{token}}\n\n📋 ORDRE DE TEST RECOMMANDÉ :\n1. Générer Token JWT (dossier Auth)\n2. Publications (CRUD)\n3. Recherche\n4. Administration (token ADMIN requis)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "JWT Token - sera rempli automatiquement après génération"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT Token ADMIN - remplir manuellement"
+    },
+    {
+      "key": "publicationId",
+      "value": "",
+      "type": "string",
+      "description": "ID de la dernière publication créée - rempli automatiquement"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth - Générer Token JWT",
+      "description": "⚠️ Votre projet n'a pas encore de /auth/login. Ces requêtes génèrent un token JWT directement pour les tests.\n\nUtilisez jwt.io ou le script pré-request pour créer un token de test.",
+      "item": [
+        {
+          "name": "Générer Token ETUDIANT (jwt.io)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://jwt.io",
+              "protocol": "https",
+              "host": ["jwt.io"]
+            },
+            "description": "📋 INSTRUCTIONS POUR GÉNÉRER UN TOKEN JWT :\n\n1. Allez sur https://jwt.io\n\n2. Dans HEADER, mettez :\n{\n  \"alg\": \"HS256\",\n  \"typ\": \"JWT\"\n}\n\n3. Dans PAYLOAD, mettez :\n{\n  \"sub\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"email\": \"etudiant@univ-dschang.cm\",\n  \"nom\": \"Jean Dupont\",\n  \"role\": \"ETUDIANT\",\n  \"iat\": 1716700000,\n  \"exp\": 9999999999\n}\n\n4. Dans VERIFY SIGNATURE, mettez votre secret JWT :\n3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007b\n\n5. Copiez le token généré en bas à gauche\n\n6. Dans Postman, allez dans Variables de collection et collez dans 'token'\n\n✅ Alternative : Exécutez la requête 'Auto-générer Token' ci-dessous"
+          },
+          "response": []
+        },
+        {
+          "name": "Auto-générer Token ETUDIANT",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Ce script génère un token JWT de test",
+                  "// Il utilise la librairie jsrsasign disponible dans Postman",
+                  "",
+                  "const secret = '3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007b';",
+                  "",
+                  "// Payload",
+                  "const header = btoa(JSON.stringify({alg: 'HS256', typ: 'JWT'})).replace(/=/g,'').replace(/\\+/g,'-').replace(/\\//g,'_');",
+                  "const payload = btoa(JSON.stringify({",
+                  "    sub: '550e8400-e29b-41d4-a716-446655440000',",
+                  "    email: 'etudiant@univ-dschang.cm',",
+                  "    nom: 'Jean Dupont',",
+                  "    role: 'ETUDIANT',",
+                  "    iat: Math.floor(Date.now()/1000),",
+                  "    exp: Math.floor(Date.now()/1000) + 86400",
+                  "})).replace(/=/g,'').replace(/\\+/g,'-').replace(/\\//g,'_');",
+                  "",
+                  "console.log('Token Header:', header);",
+                  "console.log('Token Payload:', payload);",
+                  "console.log('⚠️ Ce token ne sera pas valide car la signature HMAC ne peut pas être calculée côté Postman sans plugin.');",
+                  "console.log('👉 Utilisez jwt.io avec le secret pour générer un vrai token.');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            },
+            "description": "⚠️ IMPORTANT : Votre projet n'a pas de endpoint /auth/login/register.\n\nPour tester les routes protégées, vous avez 3 options :\n\n🔴 OPTION 1 (Recommandée) - Ajouter un AuthController :\nDemandez-moi de créer le service d'authentification complet avec /auth/register et /auth/login\n\n🟡 OPTION 2 - Générer manuellement sur jwt.io :\nSecret : 3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007b\nPayload ETUDIANT :\n{\n  \"sub\": \"550e8400-e29b-41d4-a716-446655440000\",\n  \"email\": \"etudiant@univ-dschang.cm\",\n  \"nom\": \"Jean Dupont\",\n  \"role\": \"ETUDIANT\",\n  \"exp\": 9999999999\n}\n\n🟢 OPTION 3 - Tester d'abord les routes publiques (sans token)"
+          },
+          "response": []
+        },
+        {
+          "name": "Token ADMIN - Payload",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            },
+            "description": "Payload pour token ADMIN à générer sur jwt.io :\n\n{\n  \"sub\": \"660e8400-e29b-41d4-a716-446655440001\",\n  \"email\": \"admin@univ-dschang.cm\",\n  \"nom\": \"Admin Système\",\n  \"role\": \"ADMIN\",\n  \"exp\": 9999999999\n}\n\nSecret : 3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007b\n\nUne fois généré, collez dans la variable {{adminToken}}"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "📋 Publications",
+      "item": [
+        {
+          "name": "GET - Lister publications (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Response has data', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('success');",
+                  "    pm.expect(json.success).to.be.true;",
+                  "});",
+                  "console.log('Publications:', pm.response.json());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications?page=0&size=10&sortBy=createdAt&sortDir=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"],
+              "query": [
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "10"},
+                {"key": "sortBy", "value": "createdAt"},
+                {"key": "sortDir", "value": "desc"},
+                {"key": "type", "value": "SERVICE", "disabled": true},
+                {"key": "categorie", "value": "informatique", "disabled": true},
+                {"key": "localisation", "value": "Dschang", "disabled": true}
+              ]
+            },
+            "description": "✅ Route PUBLIQUE - pas de token requis\n\nFiltres disponibles (décochez pour activer) :\n- type : SERVICE | STAGE | JOB | FORMATION | EVENEMENT\n- categorie : texte libre\n- localisation : texte libre"
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Lister par type SERVICE",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications?type=SERVICE&page=0&size=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"],
+              "query": [
+                {"key": "type", "value": "SERVICE"},
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "5"}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Lister par type STAGE",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications?type=STAGE&page=0&size=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"],
+              "query": [
+                {"key": "type", "value": "STAGE"},
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "5"}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - Créer publication SERVICE 🔒",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Publication créée', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    if (json.data && json.data.id) {",
+                  "        pm.collectionVariables.set('publicationId', json.data.id);",
+                  "        console.log('✅ publicationId sauvegardé:', json.data.id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"SERVICE\",\n  \"titre\": \"Cours de mathématiques niveau terminal\",\n  \"description\": \"Je propose des cours de mathématiques pour les élèves de terminale et étudiants en 1ère année. 5 ans d'expérience. Résultats garantis.\",\n  \"categorie\": \"Tutorat\",\n  \"localisation\": \"Dschang, Cameroun\",\n  \"dateExpiration\": \"2026-12-31\",\n  \"medias\": []\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            },
+            "description": "🔒 Token requis - Rôle : ETUDIANT, ENTREPRISE ou PARTICULIER\n\nTypes disponibles : SERVICE | STAGE | JOB | FORMATION | EVENEMENT\n\n⚠️ La publication sera créée avec statut EN_MODERATION\nUn admin doit la valider pour qu'elle soit visible publiquement."
+          },
+          "response": []
+        },
+        {
+          "name": "POST - Créer publication STAGE 🔒",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"STAGE\",\n  \"titre\": \"Stage développeur web - Startup FinTech Douala\",\n  \"description\": \"Nous cherchons un stagiaire développeur web passionné pour rejoindre notre équipe. Stack : React + Spring Boot. Durée : 3 mois. Rémunération : 50 000 FCFA/mois.\",\n  \"categorie\": \"Informatique\",\n  \"localisation\": \"Douala, Cameroun\",\n  \"dateExpiration\": \"2026-08-31\",\n  \"medias\": []\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - Créer publication EVENEMENT 🔒",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"EVENEMENT\",\n  \"titre\": \"Hackathon Innovation Numérique - Université de Dschang\",\n  \"description\": \"48h pour créer une solution numérique innovante. Ouvert à tous les étudiants. Prix : 500 000 FCFA pour le projet gagnant. Inscriptions gratuites.\",\n  \"categorie\": \"Hackathon\",\n  \"localisation\": \"Université de Dschang, Campus principal\",\n  \"dateExpiration\": \"2026-07-15\",\n  \"medias\": []\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - Créer publication JOB 🔒",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"JOB\",\n  \"titre\": \"Livreur à vélo - Mission ponctuelle weekend\",\n  \"description\": \"Recherche étudiant disponible le weekend pour des livraisons dans le campus. Paiement à la course : 500 FCFA/livraison. Vélo fourni.\",\n  \"categorie\": \"Livraison\",\n  \"localisation\": \"Campus Université de Dschang\",\n  \"dateExpiration\": \"2026-06-30\",\n  \"medias\": []\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST - Créer publication FORMATION 🔒",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"FORMATION\",\n  \"titre\": \"Formation Flutter & Dart - Mobile Development\",\n  \"description\": \"Apprenez à créer des applications mobiles cross-platform avec Flutter. Durée : 4 semaines, 3h/semaine. Tarif : 25 000 FCFA. Présentiel à Dschang.\",\n  \"categorie\": \"Développement Mobile\",\n  \"localisation\": \"Dschang, Cameroun\",\n  \"dateExpiration\": \"2026-09-01\",\n  \"medias\": []\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Détail publication par ID (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 ou 404', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if (pm.response.code === 404) {",
+                  "    console.log('⚠️ Publication non trouvée - créez-en une d abord');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications/{{publicationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications", "{{publicationId}}"]
+            },
+            "description": "✅ Route PUBLIQUE\nUtilise l'ID sauvegardé automatiquement après POST\n\nSi vide, remplacez {{publicationId}} par un vrai UUID"
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Mes publications 🔒",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications/mes-publications?page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications", "mes-publications"],
+              "query": [
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "10"}
+              ]
+            },
+            "description": "🔒 Token requis\nRetourne uniquement les publications de l'utilisateur connecté (extrait du JWT)"
+          },
+          "response": []
+        },
+        {
+          "name": "PUT - Modifier publication 🔒",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"Cours de mathématiques - TITRE MODIFIÉ\",\n  \"description\": \"Description mise à jour avec plus de détails sur mon offre de tutorat en mathématiques.\",\n  \"categorie\": \"Tutorat\",\n  \"localisation\": \"Dschang, Cameroun\",\n  \"dateExpiration\": \"2026-12-31\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications/{{publicationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications", "{{publicationId}}"]
+            },
+            "description": "🔒 Token requis - Seul l'auteur ou un ADMIN peut modifier"
+          },
+          "response": []
+        },
+        {
+          "name": "POST - Signaler publication 🔒",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications/{{publicationId}}/signaler",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications", "{{publicationId}}", "signaler"]
+            },
+            "description": "🔒 Token requis\nSignale une publication comme inappropriée\nLa publication sera visible dans le tableau admin sous 'signalées'"
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE - Supprimer publication 🔒",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications/{{publicationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications", "{{publicationId}}"]
+            },
+            "description": "🔒 Token requis - Seul l'auteur ou un ADMIN peut supprimer\n⚠️ Action irréversible"
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Test validation - Titre manquant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 400 (validation)', () => pm.response.to.have.status(400));",
+                  "console.log('Erreur validation:', pm.response.json());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"SERVICE\",\n  \"description\": \"Description sans titre - doit retourner 400\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            },
+            "description": "Test négatif : doit retourner 400 car le titre est obligatoire (@NotBlank)"
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Test sans token - 401",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 ou 403 sans token', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"SERVICE\",\n  \"titre\": \"Test sans token\",\n  \"description\": \"Doit être refusé\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            },
+            "description": "Test sécurité : POST sans token doit retourner 401/403"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🔍 Recherche Elasticsearch",
+      "item": [
+        {
+          "name": "GET - Recherche full-text (public)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "console.log('Résultats recherche:', pm.response.json());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/recherche?q=mathématiques&page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "recherche"],
+              "query": [
+                {"key": "q", "value": "mathématiques"},
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "10"},
+                {"key": "type", "value": "SERVICE", "disabled": true},
+                {"key": "categorie", "value": "Tutorat", "disabled": true},
+                {"key": "localisation", "value": "Dschang", "disabled": true}
+              ]
+            },
+            "description": "✅ Route PUBLIQUE - Recherche full-text Elasticsearch\n\nParamètres :\n- q : texte de recherche (cherche dans titre + description)\n- type : filtre par type (SERVICE, STAGE, JOB, FORMATION, EVENEMENT)\n- categorie : filtre par catégorie\n- localisation : filtre par ville/campus\n- page/size : pagination"
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Recherche par type STAGE",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/recherche?type=STAGE&page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "recherche"],
+              "query": [
+                {"key": "type", "value": "STAGE"},
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "10"}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Recherche combinée",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/recherche?q=développeur&type=STAGE&localisation=Douala",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "recherche"],
+              "query": [
+                {"key": "q", "value": "développeur"},
+                {"key": "type", "value": "STAGE"},
+                {"key": "localisation", "value": "Douala"}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Recherche vide (tous résultats)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/recherche?page=0&size=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "recherche"],
+              "query": [
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "20"}
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🛡️ Administration (ADMIN only)",
+      "item": [
+        {
+          "name": "GET - Statistiques dashboard 🔒ADMIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 403) {",
+                  "    console.log('⚠️ Token ADMIN requis - utilisez {{adminToken}}');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/statistiques",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "statistiques"]
+            },
+            "description": "🔒 Token ADMIN requis (role: ADMIN dans le JWT)\n\nRetourne :\n- totalPublications\n- publicationsActives\n- publicationsEnModeration\n- publicationsArchivees\n- publicationsSignalees\n- publicationsParType (breakdown par type)"
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Toutes publications (admin) 🔒ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/publications?page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "publications"],
+              "query": [
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "10"},
+                {"key": "statut", "value": "EN_MODERATION", "disabled": true}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Publications en modération 🔒ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/publications/en-moderation?page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "publications", "en-moderation"],
+              "query": [
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "10"}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Publications signalées 🔒ADMIN",
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/publications/signalees?page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "publications", "signalees"],
+              "query": [
+                {"key": "page", "value": "0"},
+                {"key": "size", "value": "10"}
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH - Valider publication 🔒ADMIN",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    console.log('Publication validée:', json.data?.statut);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/publications/{{publicationId}}/valider",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "publications", "{{publicationId}}", "valider"]
+            },
+            "description": "🔒 Token ADMIN requis\nPasse le statut de EN_MODERATION → ACTIVE\nLa publication devient visible publiquement"
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH - Rejeter publication 🔒ADMIN",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}", "type": "text"},
+              {"key": "Content-Type", "value": "application/json", "type": "text"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motif\": \"Contenu inapproprié ou ne respectant pas les règles de la plateforme\"\n}",
+              "options": {"raw": {"language": "json"}}
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/publications/{{publicationId}}/rejeter",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "publications", "{{publicationId}}", "rejeter"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PATCH - Archiver publication 🔒ADMIN",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/publications/{{publicationId}}/archiver",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "publications", "{{publicationId}}", "archiver"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "DELETE - Supprimer publication définitivement 🔒ADMIN",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{adminToken}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/publications/{{publicationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "publications", "{{publicationId}}"]
+            },
+            "description": "⚠️ Suppression définitive - irréversible"
+          },
+          "response": []
+        },
+        {
+          "name": "❌ Test accès admin sans token ADMIN - 403",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 403 sans rôle ADMIN', () => {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([401, 403]);",
+                  "    console.log('✅ Accès correctement refusé');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{token}}", "type": "text"}
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/statistiques",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "admin", "statistiques"]
+            },
+            "description": "Test sécurité : token ETUDIANT ne doit pas accéder aux routes ADMIN"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "🏥 Health Check",
+      "item": [
+        {
+          "name": "GET - App running",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('App accessible', () => {",
+                  "    pm.expect(pm.response.code).to.not.equal(0);",
+                  "    console.log('Status:', pm.response.status);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/publications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "publications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Swagger UI",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/swagger-ui.html",
+              "host": ["{{baseUrl}}"],
+              "path": ["swagger-ui.html"]
+            },
+            "description": "Ouvre la documentation Swagger de votre API"
+          },
+          "response": []
+        },
+        {
+          "name": "GET - OpenAPI JSON",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api-docs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api-docs"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET - Elasticsearch health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Elasticsearch running', () => pm.response.to.have.status(200));",
+                  "console.log('ES Version:', pm.response.json().version?.number);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:9200",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "9200"
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
