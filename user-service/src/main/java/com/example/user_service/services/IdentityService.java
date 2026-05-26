@@ -31,6 +31,7 @@ public class IdentityService {
                 .password(passwordEncoder.encode(request.getPassword())) // Hachage du mot de passe
                 .role(request.getRole())
                 .nomPrenom(request.getNomPrenom())
+                .telephone(request.getTelephone())
                 .universite(request.getUniversite())
                 .competences(request.getCompetences())
                 .rccm(request.getRccm())

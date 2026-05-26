@@ -1,4 +1,5 @@
 package com.example.user_service.models;
+
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
@@ -14,7 +15,7 @@ import java.util.UUID;
 public class Utilisateur {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID) // Génère automatiquement un identifiant unique UUID 
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @Column(unique = true, nullable = false)
@@ -30,15 +31,20 @@ public class Utilisateur {
     @Column(name = "nom_prenom", nullable = false)
     private String nomPrenom;
 
+    @Column(nullable = false)
+    private String telephone;
+
     private String photo;
 
-    // Champs spécifiques aux Étudiants [cite: 63, 142]
+    // Champs spécifiques aux étudiants
     private String universite;
     private String competences;
 
-    // Champs spécifiques aux Entreprises [cite: 64]
-    private String rccm; 
+    // Champs spécifiques aux entreprises
+    private String rccm;
     private String secteur;
+
+    @Column(length = 1000)
     private String description;
 
     @Enumerated(EnumType.STRING)
@@ -48,13 +54,12 @@ public class Utilisateur {
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
-    // Cette méthode s'exécute automatiquement juste avant l'insertion en base de données 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now(); // Enregistre la date actuelle 
-        
-        // Règle métier du cahier des charges : Les entreprises doivent être validées manuellement, 
-        // les autres comptes (étudiants, particuliers) sont actifs immédiatement[cite: 66].
+
+        this.createdAt = LocalDateTime.now();
+
+        // Les entreprises doivent être validées manuellement
         if (this.role == Role.ENTREPRISE) {
             this.status = Status.EN_ATTENTE;
         } else {

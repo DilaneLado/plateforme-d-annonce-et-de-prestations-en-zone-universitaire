@@ -7,6 +7,7 @@ public class RegisterRequest {
     private String email;
     private String password;
     private String nomPrenom;
+    private String telephone;
     private Role role;
 
     // Optionnels selon le profil
