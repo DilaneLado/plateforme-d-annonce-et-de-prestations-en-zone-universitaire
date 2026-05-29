@@ -15,8 +15,8 @@ import java.util.UUID;
 public class Utilisateur {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
+    @Column(name = "id", columnDefinition = "VARCHAR(36)", updatable = false, nullable = false)
+    private String id;  // ← String au lieu de UUID
 
     @Column(unique = true, nullable = false)
     private String email;
@@ -36,11 +36,9 @@ public class Utilisateur {
 
     private String photo;
 
-    // Champs spécifiques aux étudiants
     private String universite;
     private String competences;
 
-    // Champs spécifiques aux entreprises
     private String rccm;
     private String secteur;
 
@@ -56,10 +54,10 @@ public class Utilisateur {
 
     @PrePersist
     protected void onCreate() {
-
+        if (this.id == null) {
+            this.id = UUID.randomUUID().toString(); // ← génère "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+        }
         this.createdAt = LocalDateTime.now();
-
-        // Les entreprises doivent être validées manuellement
         if (this.role == Role.ENTREPRISE) {
             this.status = Status.EN_ATTENTE;
         } else {

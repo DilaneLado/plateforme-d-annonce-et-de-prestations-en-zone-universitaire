@@ -7,7 +7,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface UtilisateurRepository extends JpaRepository<Utilisateur, UUID> {
+public interface UtilisateurRepository extends JpaRepository<Utilisateur, String> {
     
     // Pour vérifier si l'email existe déjà lors de l'inscription
     boolean existsByEmail(String email);

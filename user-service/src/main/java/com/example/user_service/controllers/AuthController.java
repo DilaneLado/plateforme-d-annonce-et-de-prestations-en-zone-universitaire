@@ -18,6 +18,8 @@ public class AuthController {
 
     private final IdentityService service;
 
+
+
     // URL : POST http://localhost:8080/api/auth/register
     @PostMapping("/register")
     public ResponseEntity<ProfilResponse> register(@RequestBody RegisterRequest request) {

@@ -9,7 +9,7 @@ import java.util.UUID;
 @Data
 @Builder
 public class ProfilResponse {
-    private UUID id;
+    private String id;
     private String email;
     private Role role;
     private String nomPrenom;

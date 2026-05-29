@@ -18,14 +18,14 @@ public class ProfilController {
 
     // URL : GET http://localhost:8080/api/profils/{id}
     @GetMapping("/{id}")
-    public ResponseEntity<ProfilResponse> getProfil(@PathVariable UUID id) {
+    public ResponseEntity<ProfilResponse> getProfil(@PathVariable String id) {
         ProfilResponse reponse = service.obtenirProfil(id);
         return ResponseEntity.ok(reponse);
     }
 
     // URL : PUT http://localhost:8080/api/profils/{id}
     @PutMapping("/{id}")
-    public ResponseEntity<ProfilResponse> updateProfil(@PathVariable UUID id, @RequestBody ProfilUpdateRequest request) {
+    public ResponseEntity<ProfilResponse> updateProfil(@PathVariable String id, @RequestBody ProfilUpdateRequest request) {
         ProfilResponse reponse = service.modifierProfil(id, request);
         return ResponseEntity.ok(reponse);
     }
