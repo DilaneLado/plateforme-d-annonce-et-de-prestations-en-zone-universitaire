@@ -1,0 +1,434 @@
+{
+  "info": {
+    "name": "User Service - Tests complets",
+    "description": "Collection de tests pour le user-service (inscription, connexion, profil)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8081",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Authentification",
+      "item": [
+        {
+          "name": "1. Inscription - Étudiant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Réponse contient id et email', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "    pm.expect(json.role).to.eql('ETUDIANT');",
+                  "    pm.expect(json.status).to.eql('ACTIF');",
+                  "    // Sauvegarder l'id pour les tests suivants",
+                  "    pm.collectionVariables.set('userId', json.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"etudiant@test.cm\",\n  \"password\": \"motdepasse123\",\n  \"nomPrenom\": \"Jean Dupont\",\n  \"telephone\": \"699000001\",\n  \"role\": \"ETUDIANT\",\n  \"universite\": \"Université de Dschang\",\n  \"competences\": \"Java, Spring Boot, Angular\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "2. Inscription - Entreprise",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201 Created', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Entreprise en attente de validation', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.role).to.eql('ENTREPRISE');",
+                  "    pm.expect(json.status).to.eql('EN_ATTENTE');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"entreprise@test.cm\",\n  \"password\": \"motdepasse123\",\n  \"nomPrenom\": \"Acme SARL\",\n  \"telephone\": \"699000002\",\n  \"role\": \"ENTREPRISE\",\n  \"rccm\": \"RC/DLA/2024/B/001\",\n  \"secteur\": \"Informatique\",\n  \"description\": \"Société de développement logiciel\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "3. Inscription - Email déjà utilisé (doit échouer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 500 - email déjà pris', function () {",
+                  "    pm.response.to.have.status(500);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"etudiant@test.cm\",\n  \"password\": \"autremotdepasse\",\n  \"nomPrenom\": \"Autre Personne\",\n  \"telephone\": \"699000099\",\n  \"role\": \"ETUDIANT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "4. Connexion - Succès",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Token JWT reçu', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('token');",
+                  "    pm.expect(json.tokenType).to.eql('Bearer');",
+                  "    pm.expect(json.token).to.be.a('string').and.not.empty;",
+                  "    // Sauvegarder le token pour les requêtes protégées",
+                  "    pm.collectionVariables.set('token', json.token);",
+                  "});",
+                  "",
+                  "pm.test('Email et rôle présents', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.email).to.eql('etudiant@test.cm');",
+                  "    pm.expect(json.role).to.eql('ETUDIANT');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"etudiant@test.cm\",\n  \"password\": \"motdepasse123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "5. Connexion - Mauvais mot de passe (doit échouer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 500 - identifiants incorrects', function () {",
+                  "    pm.response.to.have.status(500);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"etudiant@test.cm\",\n  \"password\": \"mauvaismdp\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "6. Connexion - Email inexistant (doit échouer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 500 - utilisateur inexistant', function () {",
+                  "    pm.response.to.have.status(500);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"inconnu@test.cm\",\n  \"password\": \"motdepasse123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👤 Profil",
+      "item": [
+        {
+          "name": "7. Obtenir profil par ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Profil complet retourné', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('email');",
+                  "    pm.expect(json).to.have.property('role');",
+                  "    pm.expect(json).to.have.property('status');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/profil/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "profil", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "8. Modifier profil",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 OK', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Profil mis à jour', function () {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.nomPrenom).to.eql('Jean Dupont Modifié');",
+                  "    pm.expect(json.competences).to.eql('Java, Spring Boot, Angular, Docker');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nomPrenom\": \"Jean Dupont Modifié\",\n  \"competences\": \"Java, Spring Boot, Angular, Docker\",\n  \"universite\": \"Université de Yaoundé I\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/profil/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "profil", "{{userId}}"]
+            }
+          }
+        },
+        {
+          "name": "9. Obtenir profil - ID inexistant (doit échouer)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 500 - utilisateur introuvable', function () {",
+                  "    pm.response.to.have.status(500);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/profil/00000000-0000-0000-0000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "profil", "00000000-0000-0000-0000-000000000000"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔑 JWT - Vérification via Gateway",
+      "item": [
+        {
+          "name": "10. Requête avec token valide (via Gateway :8080)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 - token accepté', function () {",
+                  "    pm.response.to.not.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/api/v1/publications",
+              "host": ["http://localhost:8080"],
+              "path": ["api", "v1", "publications"]
+            }
+          }
+        },
+        {
+          "name": "11. Requête sans token (via Gateway :8080)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 - non autorisé sans token', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/publications",
+              "host": ["http://localhost:8080"],
+              "path": ["api", "v1", "publications"]
+            }
+          }
+        },
+        {
+          "name": "12. Requête avec token invalide (via Gateway :8080)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 401 - token invalide rejeté', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer tokenbidoninvalide123" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/api/v1/publications",
+              "host": ["http://localhost:8080"],
+              "path": ["api", "v1", "publications"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
