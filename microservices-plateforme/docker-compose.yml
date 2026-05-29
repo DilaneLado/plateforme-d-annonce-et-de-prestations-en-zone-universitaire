@@ -1,0 +1,135 @@
+version: '3.8'
+
+services:
+
+  # ==================== INFRASTRUCTURE ====================
+
+  mysql:
+    image: mysql:8.0
+    container_name: plateforme-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: plateforme_publications
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - plateforme-network
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    container_name: plateforme-elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - es-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+    networks:
+      - plateforme-network
+
+  # ==================== SERVICE REGISTRY ====================
+
+  eureka-server:
+    build: ./eureka-server
+    container_name: plateforme-eureka
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - plateforme-network
+
+  # ==================== MICROSERVICES ====================
+
+  publication-service:
+    build: ./publication-service
+    container_name: plateforme-publication
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/plateforme_publications?createDatabaseIfNotExist=true&serverTimezone=UTC
+      - SPRING_DATASOURCE_USERNAME=root
+      - SPRING_DATASOURCE_PASSWORD=root
+      - ELASTICSEARCH_URI=http://elasticsearch:9200
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - plateforme-network
+
+  recherche-service:
+    build: ./recherche-service
+    container_name: plateforme-recherche
+    ports:
+      - "8082:8082"
+    environment:
+      - ELASTICSEARCH_URI=http://elasticsearch:9200
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - plateforme-network
+
+  administration-service:
+    build: ./administration-service
+    container_name: plateforme-administration
+    ports:
+      - "8083:8083"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      publication-service:
+        condition: service_started
+    networks:
+      - plateforme-network
+
+  # ==================== API GATEWAY (point d'entrée unique) ====================
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: plateforme-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka-server:8761/eureka/
+      - JWT_SECRET=3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007b
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - plateforme-network
+
+volumes:
+  mysql-data:
+  es-data:
+
+networks:
+  plateforme-network:
+    driver: bridge

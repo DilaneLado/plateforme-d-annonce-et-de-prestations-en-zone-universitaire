@@ -1,0 +1,1172 @@
+{
+  "info": {
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "name": "Plateforme Microservices - Université",
+    "description": "Collection complète pour tester la plateforme de publications universitaire.\n\n## Architecture\n- **API Gateway** → http://localhost:8080 (point d'entrée unique)\n- **Publication Service** → http://localhost:8081 (direct)\n- **Recherche Service** → http://localhost:8082 (direct)\n- **Administration Service** → http://localhost:8083 (direct)\n- **Eureka Server** → http://localhost:8761\n\n## Authentification\nLe Gateway est en mode DEV : sans token Bearer, il injecte automatiquement un utilisateur test (ETUDIANT). Pour simuler un ADMIN, utiliser la variable `admin_token`.\n\n## Ordre de test recommandé\n1. Health Checks\n2. Publications (CRUD)\n3. Recherche\n4. Administration (modération)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "gateway_url",   "value": "http://localhost:8080", "type": "string" },
+    { "key": "pub_url",       "value": "http://localhost:8081", "type": "string" },
+    { "key": "search_url",    "value": "http://localhost:8082", "type": "string" },
+    { "key": "admin_url",     "value": "http://localhost:8083", "type": "string" },
+    { "key": "eureka_url",    "value": "http://localhost:8761", "type": "string" },
+    { "key": "publication_id","value": "", "type": "string", "description": "Rempli automatiquement par le test de création" },
+    { "key": "jwt_token",     "value": "", "type": "string", "description": "Token JWT Bearer (optionnel en mode DEV)" }
+  ],
+  "item": [
+
+    {
+      "name": "🏥 Health Checks",
+      "description": "Vérification de l'état de tous les services de l'infrastructure.",
+      "item": [
+        {
+          "name": "Eureka Server - Dashboard",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{eureka_url}}", "host": ["{{eureka_url}}"] },
+            "description": "Dashboard Eureka — liste les services enregistrés."
+          },
+          "response": []
+        },
+        {
+          "name": "API Gateway - Health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{gateway_url}}/actuator/health", "host": ["{{gateway_url}}"], "path": ["actuator","health"] }
+          },
+          "response": []
+        },
+        {
+          "name": "API Gateway - Routes enregistrées",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{gateway_url}}/actuator/gateway/routes", "host": ["{{gateway_url}}"], "path": ["actuator","gateway","routes"] },
+            "description": "Liste les routes configurées dans le Gateway (publication, recherche, admin)."
+          },
+          "response": []
+        },
+        {
+          "name": "Publication Service - Health (direct)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{pub_url}}/actuator/health", "host": ["{{pub_url}}"], "path": ["actuator","health"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Recherche Service - Health (direct)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{search_url}}/actuator/health", "host": ["{{search_url}}"], "path": ["actuator","health"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Administration Service - Health (direct)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{admin_url}}/actuator/health", "host": ["{{admin_url}}"], "path": ["actuator","health"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Elasticsearch - Cluster Health",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "http://localhost:9200/_cluster/health", "host": ["http://localhost:9200"], "path": ["_cluster","health"] },
+            "description": "Vérifie l'état du cluster Elasticsearch (green/yellow/red)."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "📄 Publications - Via Gateway",
+      "description": "Toutes les requêtes passent par le Gateway (port 8080). En mode DEV, l'utilisateur test (ETUDIANT) est injecté automatiquement si aucun token n'est fourni.",
+      "item": [
+
+        {
+          "name": "Créer une publication (SERVICE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const body = pm.response.json();",
+                  "    if (body.data && body.data.id) {",
+                  "        pm.collectionVariables.set('publication_id', body.data.id);",
+                  "        console.log('publication_id enregistré :', body.data.id);",
+                  "    }",
+                  "}",
+                  "pm.test('Statut 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Statut initial EN_MODERATION', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.statut).to.eql('EN_MODERATION');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"SERVICE\",\n  \"titre\": \"Cours de mathématiques niveau Licence 1\",\n  \"description\": \"Propose des cours particuliers de mathématiques pour les étudiants en L1. Spécialité analyse et algèbre. Tarif négociable.\",\n  \"categorie\": \"Cours particuliers\",\n  \"localisation\": \"Dschang, Cameroun\",\n  \"medias\": [],\n  \"dateExpiration\": \"2026-12-31\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/v1/publications", "host": ["{{gateway_url}}"], "path": ["api","v1","publications"] },
+            "description": "Crée une publication. Statut initial = EN_MODERATION. L'ID est sauvegardé dans la variable `publication_id`."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Créer une publication (STAGE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 201 Created', () => pm.response.to.have.status(201));",
+                  "pm.test('Type STAGE', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.type).to.eql('STAGE');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"STAGE\",\n  \"titre\": \"Stage développeur web - Startup FinTech Douala\",\n  \"description\": \"Offre de stage de 3 mois dans une startup FinTech en pleine croissance. Stack : React, Spring Boot, PostgreSQL. Gratification selon profil.\",\n  \"categorie\": \"Informatique\",\n  \"localisation\": \"Douala, Cameroun\",\n  \"medias\": [],\n  \"dateExpiration\": \"2026-08-31\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/v1/publications", "host": ["{{gateway_url}}"], "path": ["api","v1","publications"] }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Créer une publication (JOB)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"JOB\",\n  \"titre\": \"Développeur Java Senior - CDI Yaoundé\",\n  \"description\": \"Recrutement développeur Java/Spring Boot confirmé (3+ ans d'expérience). Travail en équipe agile, projets d'envergure nationale.\",\n  \"categorie\": \"Informatique\",\n  \"localisation\": \"Yaoundé, Cameroun\",\n  \"medias\": [],\n  \"dateExpiration\": \"2026-07-15\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/v1/publications", "host": ["{{gateway_url}}"], "path": ["api","v1","publications"] }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Créer une publication (EVENEMENT)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"EVENEMENT\",\n  \"titre\": \"Hackathon IA & Agriculture - Université de Dschang\",\n  \"description\": \"48h de création autour des solutions IA pour l'agriculture en Afrique centrale. Ouvert à tous les étudiants. Prix pour le top 3.\",\n  \"categorie\": \"Technologie\",\n  \"localisation\": \"Dschang, Cameroun\",\n  \"medias\": [],\n  \"dateExpiration\": \"2026-06-20\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/v1/publications", "host": ["{{gateway_url}}"], "path": ["api","v1","publications"] }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Créer - Validation KO (titre manquant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 400 Bad Request', () => pm.response.to.have.status(400));",
+                  "pm.test('Erreur de validation présente', () => {",
+                  "    pm.expect(pm.response.text()).to.include('titre');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"SERVICE\",\n  \"description\": \"Description sans titre — doit échouer.\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/v1/publications", "host": ["{{gateway_url}}"], "path": ["api","v1","publications"] },
+            "description": "Test de validation : le champ `titre` est @NotBlank, la requête doit être rejetée."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Obtenir une publication par ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('ID correspond', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.id).to.eql(pm.collectionVariables.get('publication_id'));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications/{{publication_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications","{{publication_id}}"]
+            },
+            "description": "Utilise la variable `publication_id` remplie lors de la création."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Obtenir une publication - ID inexistant (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 404 Not Found', () => pm.response.to.have.status(404));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications/00000000-0000-0000-0000-000000000000",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications","00000000-0000-0000-0000-000000000000"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Lister les publications actives",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Structure paginée', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data).to.have.property('content');",
+                  "    pm.expect(body.data).to.have.property('totalElements');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications?page=0&size=10&sortBy=createdAt&sortDir=desc",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications"],
+              "query": [
+                { "key": "page",   "value": "0" },
+                { "key": "size",   "value": "10" },
+                { "key": "sortBy", "value": "createdAt" },
+                { "key": "sortDir","value": "desc" }
+              ]
+            },
+            "description": "Seules les publications avec statut ACTIVE sont retournées."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Lister avec filtre TYPE=SERVICE",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications?type=SERVICE&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications"],
+              "query": [
+                { "key": "type", "value": "SERVICE" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Lister avec filtre TYPE + localisation",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications?type=STAGE&localisation=Douala&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications"],
+              "query": [
+                { "key": "type",        "value": "STAGE" },
+                { "key": "localisation","value": "Douala" },
+                { "key": "page",        "value": "0" },
+                { "key": "size",        "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Lister avec filtre catégorie",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications?categorie=Informatique&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications"],
+              "query": [
+                { "key": "categorie", "value": "Informatique" },
+                { "key": "page",      "value": "0" },
+                { "key": "size",      "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Mes publications (utilisateur connecté)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications/mes-publications?page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications","mes-publications"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Retourne les publications de l'utilisateur injecté (X-User-Id depuis le Gateway)."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Modifier une publication",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Titre mis à jour', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.titre).to.include('[MAJ]');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"titre\": \"[MAJ] Cours de mathématiques niveau Licence 1 - Places disponibles\",\n  \"description\": \"Description mise à jour : cours disponibles du lundi au vendredi. Contactez-moi par messagerie.\",\n  \"localisation\": \"Dschang - Campus Université\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications/{{publication_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications","{{publication_id}}"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Signaler une publication",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Message de confirmation', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.include('signalée');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications/{{publication_id}}/signaler",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications","{{publication_id}}","signaler"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Supprimer une publication",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirmation suppression', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.include('supprimée');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/publications/{{publication_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","publications","{{publication_id}}"]
+            },
+            "description": "⚠️ Supprime définitivement la publication. Exécuter en dernier dans cette section."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "🔍 Recherche Elasticsearch - Via Gateway",
+      "description": "Recherche full-text via Elasticsearch. Uniquement les publications avec statut ACTIVE sont indexées.",
+      "item": [
+        {
+          "name": "Recherche full-text (query libre)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Structure de réponse correcte', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data).to.have.property('resultats');",
+                  "    pm.expect(body.data).to.have.property('total');",
+                  "    pm.expect(body.data).to.have.property('totalPages');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/recherche?q=développeur&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","recherche"],
+              "query": [
+                { "key": "q",    "value": "développeur" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Recherche multi-champs avec fuzzy matching (titre^2, description, categorie)."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Recherche sans filtre (toutes les publications actives)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/recherche?page=0&size=20",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","recherche"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            },
+            "description": "Sans paramètre `q`, retourne toutes les publications actives (matchAll)."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Recherche avec filtre type=STAGE",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/recherche?type=STAGE&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","recherche"],
+              "query": [
+                { "key": "type", "value": "STAGE" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Recherche combinée q + type + localisation",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/recherche?q=java&type=JOB&localisation=Yaoundé&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","recherche"],
+              "query": [
+                { "key": "q",           "value": "java" },
+                { "key": "type",        "value": "JOB" },
+                { "key": "localisation","value": "Yaoundé" },
+                { "key": "page",        "value": "0" },
+                { "key": "size",        "value": "10" }
+              ]
+            },
+            "description": "Combine full-text + filtres Elasticsearch (bool query : must + filter)."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Recherche par catégorie",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/recherche?categorie=Informatique&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","recherche"],
+              "query": [
+                { "key": "categorie", "value": "Informatique" },
+                { "key": "page",      "value": "0" },
+                { "key": "size",      "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Recherche avec fuzzy matching (faute de frappe)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/recherche?q=developeur&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","recherche"],
+              "query": [
+                { "key": "q",    "value": "developeur" },
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Le moteur utilise fuzziness=AUTO, donc 'developeur' (sans accent) peut matcher 'développeur'."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Pagination - Page 2",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/recherche?q=stage&page=1&size=5",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","recherche"],
+              "query": [
+                { "key": "q",    "value": "stage" },
+                { "key": "page", "value": "1" },
+                { "key": "size", "value": "5" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "🛡️ Administration - Via Gateway",
+      "description": "Back-office administrateur. En mode DEV, les requêtes passent même sans token ADMIN. En production, il faudra un token avec role=ADMIN.",
+      "item": [
+        {
+          "name": "Tableau de bord - Statistiques",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Statistiques présentes', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data).to.have.property('totalPublications');",
+                  "    pm.expect(body.data).to.have.property('publicationsActives');",
+                  "    pm.expect(body.data).to.have.property('publicationsEnModeration');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/statistiques",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","statistiques"]
+            },
+            "description": "Agrège les compteurs : total, actives, en modération, signalées, archivées."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Lister toutes les publications (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications?page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Tous les statuts confondus (contrairement au endpoint public)."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Lister par statut - EN_MODERATION",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications?statut=EN_MODERATION&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications"],
+              "query": [
+                { "key": "statut", "value": "EN_MODERATION" },
+                { "key": "page",   "value": "0" },
+                { "key": "size",   "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Lister par statut - ACTIVE",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications?statut=ACTIVE&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications"],
+              "query": [
+                { "key": "statut", "value": "ACTIVE" },
+                { "key": "page",   "value": "0" },
+                { "key": "size",   "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Lister par statut - ARCHIVEE",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications?statut=ARCHIVEE&page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications"],
+              "query": [
+                { "key": "statut", "value": "ARCHIVEE" },
+                { "key": "page",   "value": "0" },
+                { "key": "size",   "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Publications en attente de modération",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Toutes EN_MODERATION', () => {",
+                  "    const body = pm.response.json();",
+                  "    body.data.content.forEach(pub => {",
+                  "        pm.expect(pub.statut).to.eql('EN_MODERATION');",
+                  "    });",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications/en-moderation?page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications","en-moderation"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Publications signalées",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications/signalees?page=0&size=10",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications","signalees"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            },
+            "description": "Triées par nbSignalements décroissant."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Valider une publication (→ ACTIVE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Statut ACTIVE', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.data.statut).to.eql('ACTIVE');",
+                  "});",
+                  "pm.test('Message de validation', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.include('validée');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications/{{publication_id}}/valider",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications","{{publication_id}}","valider"]
+            },
+            "description": "Change le statut EN_MODERATION → ACTIVE. La publication est indexée dans Elasticsearch via Feign."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Rejeter une publication (→ REJETEE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Message de rejet', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.include('rejetée');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motif\": \"Contenu non conforme à la charte de la plateforme universitaire. Veuillez reformuler votre annonce.\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications/{{publication_id}}/rejeter",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications","{{publication_id}}","rejeter"]
+            },
+            "description": "Le champ `motif` est @NotBlank — obligatoire."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Rejeter - Validation KO (motif manquant)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 400 Bad Request', () => pm.response.to.have.status(400));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"motif\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications/{{publication_id}}/rejeter",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications","{{publication_id}}","rejeter"]
+            },
+            "description": "Le motif vide doit déclencher une erreur de validation 400."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Archiver une publication (→ ARCHIVEE)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Message archivage', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.include('archivée');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications/{{publication_id}}/archiver",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications","{{publication_id}}","archiver"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Supprimer définitivement (admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Message suppression', () => {",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body.message).to.include('supprimée');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{gateway_url}}/api/v1/admin/publications/{{publication_id}}",
+              "host": ["{{gateway_url}}"],
+              "path": ["api","v1","admin","publications","{{publication_id}}"]
+            },
+            "description": "⚠️ Suppression permanente — à exécuter en dernier."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "🔌 Endpoints Internes (Publication Service direct)",
+      "description": "Endpoints internes appelés normalement par l'administration-service via Feign. Accessibles directement sur le port 8081 pour debug.",
+      "item": [
+        {
+          "name": "Publications en modération (interne)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{pub_url}}/api/v1/publications/internal/en-moderation?page=0&size=10",
+              "host": ["{{pub_url}}"],
+              "path": ["api","v1","publications","internal","en-moderation"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Publications signalées (interne)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{pub_url}}/api/v1/publications/internal/signalees?page=0&size=10",
+              "host": ["{{pub_url}}"],
+              "path": ["api","v1","publications","internal","signalees"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" }
+              ]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Compter toutes les publications (interne)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Réponse numérique', () => {",
+                  "    pm.expect(parseInt(pm.response.text())).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{pub_url}}/api/v1/publications/internal/count",
+              "host": ["{{pub_url}}"],
+              "path": ["api","v1","publications","internal","count"]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Compter par statut - ACTIVE (interne)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{pub_url}}/api/v1/publications/internal/count-by-statut?statut=ACTIVE",
+              "host": ["{{pub_url}}"],
+              "path": ["api","v1","publications","internal","count-by-statut"],
+              "query": [{ "key": "statut", "value": "ACTIVE" }]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Compter par statut - EN_MODERATION (interne)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{pub_url}}/api/v1/publications/internal/count-by-statut?statut=EN_MODERATION",
+              "host": ["{{pub_url}}"],
+              "path": ["api","v1","publications","internal","count-by-statut"],
+              "query": [{ "key": "statut", "value": "EN_MODERATION" }]
+            }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Changer statut manuellement (interne)",
+          "request": {
+            "method": "PATCH",
+            "url": {
+              "raw": "{{pub_url}}/api/v1/publications/internal/{{publication_id}}/statut?statut=ACTIVE",
+              "host": ["{{pub_url}}"],
+              "path": ["api","v1","publications","internal","{{publication_id}}","statut"],
+              "query": [{ "key": "statut", "value": "ACTIVE" }]
+            },
+            "description": "Endpoint utilisé par l'administration-service via Feign Client pour changer le statut."
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "📋 Swagger / OpenAPI",
+      "description": "Documentation auto-générée par SpringDoc (accessible directement sur chaque service).",
+      "item": [
+        {
+          "name": "Swagger UI - Publication Service",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{pub_url}}/swagger-ui.html", "host": ["{{pub_url}}"], "path": ["swagger-ui.html"] }
+          },
+          "response": []
+        },
+        {
+          "name": "OpenAPI JSON - Publication Service",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{pub_url}}/api-docs", "host": ["{{pub_url}}"], "path": ["api-docs"] }
+          },
+          "response": []
+        },
+        {
+          "name": "Swagger UI - Administration Service",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{admin_url}}/swagger-ui.html", "host": ["{{admin_url}}"], "path": ["swagger-ui.html"] }
+          },
+          "response": []
+        },
+        {
+          "name": "OpenAPI JSON - Administration Service",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{admin_url}}/api-docs", "host": ["{{admin_url}}"], "path": ["api-docs"] }
+          },
+          "response": []
+        }
+      ]
+    },
+
+    {
+      "name": "🔑 Scénario : Avec Token JWT",
+      "description": "Exemples utilisant un token JWT Bearer. Renseigner la variable `jwt_token` avec un token valide signé avec la clé `3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007b`.\n\nStructure du payload attendu :\n```json\n{\n  \"sub\": \"<userId UUID>\",\n  \"email\": \"user@univ-dschang.cm\",\n  \"nom\": \"Jean Dupont\",\n  \"role\": \"ADMIN\"\n}```",
+      "item": [
+        {
+          "name": "Créer une publication (avec token ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"FORMATION\",\n  \"titre\": \"Certification AWS Solutions Architect - Préparation\",\n  \"description\": \"Programme intensif de 8 semaines pour préparer la certification AWS-SAA-C03. Cours du soir + exercices pratiques.\",\n  \"categorie\": \"Cloud\",\n  \"localisation\": \"Douala ou en ligne\",\n  \"medias\": [],\n  \"dateExpiration\": \"2026-09-30\"\n}"
+            },
+            "url": { "raw": "{{gateway_url}}/api/v1/publications", "host": ["{{gateway_url}}"], "path": ["api","v1","publications"] },
+            "description": "Requête authentifiée. Le Gateway extrait les claims du JWT et injecte X-User-Id, X-User-Email, X-User-Nom, X-User-Role."
+          },
+          "response": []
+        },
+
+        {
+          "name": "Statistiques admin (avec token ADMIN)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{jwt_token}}" }
+            ],
+            "url": { "raw": "{{gateway_url}}/api/v1/admin/statistiques", "host": ["{{gateway_url}}"], "path": ["api","v1","admin","statistiques"] }
+          },
+          "response": []
+        },
+
+        {
+          "name": "Test token invalide (→ 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Statut 401 Unauthorized', () => pm.response.to.have.status(401));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type",  "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer TOKEN_INVALIDE_ICI" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"type\": \"SERVICE\", \"titre\": \"Test\", \"description\": \"Test\" }"
+            },
+            "url": { "raw": "{{gateway_url}}/api/v1/publications", "host": ["{{gateway_url}}"], "path": ["api","v1","publications"] },
+            "description": "Un token malformé doit retourner 401 (le Gateway valide la signature JWT)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

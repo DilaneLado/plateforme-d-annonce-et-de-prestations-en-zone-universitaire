@@ -1,0 +1,120 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+      routes:
+        # Ajoute ceci AVANT les autres routes
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/auth/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: user-cb
+                fallbackUri: forward:/fallback/user
+        - id: publication-service
+          uri: lb://publication-service
+          predicates:
+            - Path=/api/v1/publications/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: publication-cb
+                fallbackUri: forward:/fallback/publication
+
+        - id: recherche-service
+          uri: lb://recherche-service
+          predicates:
+            - Path=/api/v1/recherche/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: recherche-cb
+                fallbackUri: forward:/fallback/recherche
+
+        - id: administration-service
+          uri: lb://administration-service
+          predicates:
+            - Path=/api/v1/admin/**
+          filters:
+            - name: CircuitBreaker
+              args:
+                name: admin-cb
+                fallbackUri: forward:/fallback/admin
+
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOriginPatterns: "*"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - PATCH
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://localhost:8761/eureka/}
+    initial-instance-info-replication-interval-seconds: 5
+    registry-fetch-interval-seconds: 5
+  instance:
+    prefer-ip-address: true
+    lease-renewal-interval-in-seconds: 5
+    lease-expiration-duration-in-seconds: 10
+
+jwt:
+  secret: ${JWT_SECRET:3cfa76ef14937c1c0ea519f8fc057a80fcd04a7420f8e8bcd0a7567c272e007b}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      publication-cb:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+      recherche-cb:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+      admin-cb:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+  timelimiter:
+    instances:
+      publication-cb:
+        timeout-duration: 5s
+      recherche-cb:
+        timeout-duration: 5s
+      admin-cb:
+        timeout-duration: 5s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    com.universite.gateway: DEBUG
