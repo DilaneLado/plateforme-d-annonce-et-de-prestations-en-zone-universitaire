@@ -1,0 +1,26 @@
+server:
+  port: 8083
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/messagerie
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+app:
+  rabbitmq:
+    exchange: messagerie-exchange
+    routing-key-message: message.nouveau
+  jwt:
+    secret: UIzAfmfs+tBnR2kyNukLczxBsqzxCauFvkAMPFj8DRA0nHqVVWAXlHdc+yhjgqwIUN6rB3enVpjo6waNJwK4kg==
+    
+     
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

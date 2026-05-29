@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Messagerie avec JWT</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        input, button { margin: 5px; padding: 8px; }
+        #messages { list-style: none; padding: 0; }
+        #messages li { background: #f0f0f0; margin: 5px; padding: 8px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Test Messagerie (JWT)</h1>
+
+    <div>
+        <label>Token JWT :</label>
+        <input type="text" id="jwtToken" size="60" placeholder="eyJhbGciOiJIUzI1NiJ9...">
+        <br/><small>Connecte-toi au service Compte pour obtenir un token valide.</small>
+    </div>
+
+    <hr/>
+    <div>
+        <h3>Conversation</h3>
+        <label>Participant 1 (votre UUID) :</label>
+        <input type="text" id="userId1" value="12345678-1234-1234-1234-123456789abc">
+        <label>Participant 2 :</label>
+        <input type="text" id="userId2" value="abcdefab-1234-1234-1234-abcdefabcdef">
+        <button onclick="createConversation()">Créer / Récupérer conversation</button>
+        <br/>
+        <label>Conversation ID :</label>
+        <input type="text" id="convId" readonly size="30">
+    </div>
+
+    <hr/>
+    <div>
+        <h3>Messages</h3>
+        <input type="text" id="messageInput" placeholder="Votre message...">
+        <button onclick="sendMessage()">Envoyer</button>
+    </div>
+
+    <hr/>
+    <h3>Messages reçus :</h3>
+    <ul id="messages"></ul>
+
+    <script>
+        var stompClient = null;
+        var currentConversationId = null;
+
+        // Créer ou récupérer une conversation
+        async function createConversation() {
+            const userId1 = document.getElementById('userId1').value;
+            const userId2 = document.getElementById('userId2').value;
+            const token = document.getElementById('jwtToken').value;
+
+            const response = await fetch('/api/conversations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({
+                    participant1: userId1,
+                    participant2: userId2
+                })
+            });
+
+            if (!response.ok) {
+                alert('Erreur lors de la création de la conversation. Vérifie le token.');
+                return;
+            }
+
+            const data = await response.json();
+            currentConversationId = data.id;
+            document.getElementById('convId').value = currentConversationId;
+            connectWebSocket();  // Se connecter au WebSocket avec le token
+        }
+
+        // Connexion STOMP avec JWT
+        function connectWebSocket() {
+            const token = document.getElementById('jwtToken').value;
+            if (!token) {
+                alert('Token JWT manquant');
+                return;
+            }
+
+            const socket = new SockJS('/ws-chat');
+            stompClient = Stomp.over(socket);
+
+            // Connexion avec le header Authorization
+            stompClient.connect(
+                { Authorization: 'Bearer ' + token },
+                function(frame) {
+                    console.log('Connecté : ' + frame);
+                    // S'abonner à la conversation active
+                    stompClient.subscribe('/topic/conversation/' + currentConversationId, function(message) {
+                        const msg = JSON.parse(message.body);
+                        const li = document.createElement("li");
+                        li.textContent = `[${new Date(msg.timestamp).toLocaleTimeString()}] ${msg.expediteurId} : ${msg.contenu}`;
+                        document.getElementById('messages').appendChild(li);
+                    });
+                    document.getElementById('messages').innerHTML = ''; // Effacer les anciens messages
+                },
+                function(error) {
+                    alert('Erreur de connexion WebSocket (token invalide ou expiré ?)');
+                    console.error(error);
+                }
+            );
+        }
+
+        // Envoyer un message via STOMP
+        function sendMessage() {
+            const content = document.getElementById('messageInput').value;
+            if (!stompClient || !stompClient.connected) {
+                alert('WebSocket non connecté. Crée/rejoins une conversation d\'abord.');
+                return;
+            }
+            stompClient.send("/app/chat", {}, JSON.stringify({
+                conversationId: currentConversationId,
+                contenu: content
+            }));
+            document.getElementById('messageInput').value = '';
+        }
+    </script>
+</body>
+</html>
